@@ -1,10 +1,35 @@
 ﻿# app/data/dat_parser.py
-import os, json, subprocess
+import os, json, subprocess, tempfile
 from typing import List, Dict, Any
 
 # tools/java relative to this file: app/data -> ../../tools/java
 JAVA_DIR  = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "tools", "java"))
 DUMP_MAIN = "DumpLoadouts"
+WRITE_MAIN = "WriteLoadouts"
+
+
+def _java_classpath(dotjar: str) -> str:
+    helper_root = os.path.abspath(JAVA_DIR)
+    if dotjar:
+        return os.pathsep.join([helper_root, dotjar])
+    return helper_root
+
+
+def _ensure_java_helper(main: str, classpath: str | None = None) -> None:
+    source = os.path.join(JAVA_DIR, f"{main}.java")
+    if not os.path.exists(source):
+        raise FileNotFoundError(source)
+    target = os.path.join(JAVA_DIR, f"{main}.class")
+    needs_compile = not os.path.exists(target) or os.path.getmtime(target) < os.path.getmtime(source)
+    if not needs_compile:
+        return
+    cmd = ["javac"]
+    if classpath:
+        cmd.extend(["-cp", classpath])
+    cmd.append(source)
+    proc = subprocess.run(cmd, cwd=JAVA_DIR, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or "javac failed")
 
 def _is_java_serialized(path: str) -> bool:
     try:
@@ -29,10 +54,24 @@ def parse_dat(path: str, type_name: str) -> List[Dict[str, Any]]:
 
     if _is_java_serialized(path):
         dotjar = _dot_jar()
+        if not os.path.exists(dotjar):
+            return [{
+                "key": f"raw_{type_name.lower()}",
+                "name": "DOT.jar not found",
+                "error": dotjar
+            }]
+        try:
+            _ensure_java_helper(DUMP_MAIN, _java_classpath(dotjar))
+        except Exception as exc:
+            return [{
+                "key": f"raw_{type_name.lower()}",
+                "name": "Java helper compile failed",
+                "error": str(exc)
+            }]
         cmd = [
             "java",
             "-Dfile.encoding=UTF-8",         # force UTF-8 stdout on Windows
-            "-cp", f".;{dotjar}",
+            "-cp", _java_classpath(dotjar),
             DUMP_MAIN, path, "true"          # arrays=true
         ]
         # capture as BYTES; we’ll decode ourselves
@@ -73,12 +112,44 @@ def parse_dat(path: str, type_name: str) -> List[Dict[str, Any]]:
              "raw": txt[:4000]}]
 
 def serialize_dat(path: str, type_name: str, records: List[Dict[str, Any]]):
-    """
-    V1: don’t rewrite the Java-serialized .dat yet.
-    Write a preview JSON next to it so we can inspect diffs.
-    (The writer helper will replace this in the next step.)
-    """
     preview = os.path.splitext(path)[0] + ".json"
     os.makedirs(os.path.dirname(preview), exist_ok=True)
     with open(preview, "w", encoding="utf-8", newline="\n") as f:
         json.dump(records, f, indent=2, ensure_ascii=False)
+
+    if type_name == "Loadouts":
+        _write_loadouts(path, records)
+
+
+def _write_loadouts(path: str, records: List[Dict[str, Any]]):
+    if not os.path.exists(path):
+        raise FileNotFoundError(path)
+    dotjar = _dot_jar()
+    if not os.path.exists(dotjar):
+        raise FileNotFoundError(dotjar)
+    try:
+        _ensure_java_helper(WRITE_MAIN, _java_classpath(dotjar))
+    except Exception as exc:
+        raise RuntimeError(f"javac failed for {WRITE_MAIN}: {exc}") from exc
+
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".json") as tmp:
+        json.dump(records, tmp, ensure_ascii=False)
+        tmp_path = tmp.name
+
+    try:
+        cmd = [
+            "java",
+            "-Dfile.encoding=UTF-8",
+            "-cp", _java_classpath(dotjar),
+            WRITE_MAIN,
+            path,
+            tmp_path,
+        ]
+        proc = subprocess.run(cmd, cwd=JAVA_DIR, capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or "WriteLoadouts failed")
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
