@@ -1,0 +1,19 @@
+﻿{
+  "type": "object",
+  "title": "Loadout",
+  "primaryKey": "key",
+  "fields": {
+    "key": {"type": "string", "required": true},
+    "name": {"type": "string", "required": true},
+    "description": {"type": "string"},
+    "sortOrder": {"type": "integer", "default": 0},
+    "selectMajorSkills": {"type": "integer", "default": 0},
+    "selectMinorSkills": {"type": "integer", "default": 0},
+    "majorSkills": {"type": "array", "items": {"type": "string"}},
+    "minorSkills": {"type": "array", "items": {"type": "string"}},
+    "abilities": {"type": "array", "items": {"type": "string"}},
+    "perks": {"type": "array", "items": {"type": "string"}},
+    "lootable": {"type": "string"},
+    "defaultBodyType": {"type": "string"}
+  }
+}

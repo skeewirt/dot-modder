@@ -1,0 +1,4 @@
+﻿PySide6>=6.7
+jsonpatch>=1.33
+fastjsonschema>=2.19
+pyinstaller>=6.6

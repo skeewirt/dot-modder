@@ -1,0 +1,13 @@
+﻿{
+  "type": "object",
+  "title": "Background",
+  "primaryKey": "key",
+  "fields": {
+    "key": {"type": "string", "required": true},
+    "name": {"type": "string", "required": true},
+    "description": {"type": "string"},
+    "abilities": {"type": "array", "items": {"type": "string"}},
+    "perks": {"type": "array", "items": {"type": "string"}},
+    "sortOrder": {"type": "integer", "default": 0}
+  }
+}

@@ -1,0 +1,38 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Qt / PyInstaller artifacts
+*.spec
+
+# Java
+tools/java/*.class
+
+# Editor/OS
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Local data & logs
+*.log
+.env
+.env.*
+*.tmp
+
+# Game content (never commit)
+DOT.jar
+**/modules/*.dat
+**/dot/*.dat
+**/dot/**
+
+# Our app’s temp extracts
+# (we write to %TEMP%\dotmodder_*, but keep patterns just in case)
+**/dotmodder_*/
